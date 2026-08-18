@@ -1,7 +1,7 @@
 {
   "name": "dsh-trace-narrator",
   "description": "DSH 插件：把会话轨迹变成可分享、可复盘、可教学的结构化报告（脱敏 + LLM 总结，HTML/MD/JSON 输出）",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -24,7 +24,7 @@
     "build": "tsup",
     "watch": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --pool=threads"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.0",

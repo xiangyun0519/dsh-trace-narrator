@@ -48,6 +48,8 @@ export * from './i18n/index.ts'
 export * from './narrator.ts'
 // v0.9.0：opt-in 上报协议。
 export * from './upload.ts'
+// v1.1.0：报告 HTTP 链接服务（对话内直接点开报告）。
+export * from './serve.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')
@@ -67,6 +69,7 @@ import type { NarratorDeps } from './narrator.ts'
 import { strings } from './i18n/index.ts'
 import type { UiLang } from './i18n/index.ts'
 import { uploadReport } from './upload.ts'
+import { REPORT_ROUTE, handleReportRequest, reportUrl } from './serve.ts'
 
 // ---- 生产服务的结构契约（避免引入 @deepseek-ai/dsh-* 运行时依赖）----
 
@@ -102,6 +105,14 @@ interface SandboxPolicyLike {
 
 interface AgentDefaultModelLike {
   currentSelection(): { provider: string; model: string } | undefined
+}
+
+interface WebServerLike {
+  register(route: {
+    kind: 'exact' | 'prefix'
+    path: string
+    handler: (req: unknown, res: unknown) => void | Promise<void>
+  }): () => void
 }
 
 /** 可选服务读取：未注册时返回 undefined（headless/裁剪组合下优雅降级）。 */
@@ -163,6 +174,7 @@ export class TraceNarratorService extends Service {
   static Config: z<TraceNarratorConfig> = buildConfigSchema()
 
   private readonly scope: SettingsScope<TraceNarratorConfig>
+  private readonly webServer: WebServerLike | undefined
 
   constructor(ctx: Context, config: TraceNarratorConfig) {
     super(ctx, 'traceNarrator')
@@ -172,7 +184,21 @@ export class TraceNarratorService extends Service {
       base: config,
     })
 
-    ctx.logger.info('trace-narrator v0.8.0: mounted (settings namespace + /trace-narrate)')
+    // 报告 HTTP 路由：/trace-narrate/<文件名> → 同源链接，对话内直接点开。
+    this.webServer = getService<WebServerLike>(ctx, 'webServer')
+    if (this.webServer !== undefined) {
+      ctx.effect(() => this.webServer!.register({
+        kind: 'prefix',
+        path: REPORT_ROUTE,
+        handler: (req, res) => handleReportRequest(
+          { root: this.resolveReportRoot() },
+          req as { url?: string; method?: string },
+          res as { writeHead(status: number, headers: Record<string, string>): void; end(body: string): void },
+        ),
+      }))
+    }
+
+    ctx.logger.info('trace-narrator v1.1.0: mounted (settings + /trace-narrate + report route)')
 
     ctx.commands.register({
       name: 'trace-narrate',
@@ -187,6 +213,15 @@ export class TraceNarratorService extends Service {
   /** 当前已解析配置（schema 默认 + 行配置 + 用户设置）。 */
   resolvedConfig(): TraceNarratorConfig {
     return this.scope.get()
+  }
+
+  /** 报告落盘目录（绝对路径；写盘与 HTTP 服务共用同一解析）。 */
+  private resolveReportRoot(): string {
+    const policy = getService<SandboxPolicyLike>(this.ctx, 'sandboxPolicy')
+    const workspaceRoot = policy?.workspaceRoot ?? process.cwd()
+    const outputDir = this.scope.get().outputDir
+    if (isAbsolute(outputDir)) return outputDir
+    return join(workspaceRoot, outputDir.length > 0 ? outputDir : 'trace-narrate')
   }
 
   /** 命令入口：解析参数 → 组装生产依赖 → 编排管线。 */
@@ -346,6 +381,10 @@ export class TraceNarratorService extends Service {
             body,
           )
         },
+      }),
+      // 同源报告链接（webServer 存在时）：命令回复里直接可点开。
+      ...(this.webServer === undefined ? {} : {
+        serveUrl: (filename: string) => reportUrl(filename),
       }),
       ...(config.audit.enabled ? {
         auditWriter: createFileAuditWriter(

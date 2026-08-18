@@ -4,7 +4,7 @@ DeepSeek Harness 插件：把 dsh 最被称赞的 trajectory 特性从本地私�
 
 ## 特性
 
-- **`/trace-narrate` 命令**：当前会话或任意历史会话 → 结构化报告
+- **`/trace-narrate` 命令**：当前会话或任意历史会话 → 结构化报告；**回复里直接给可点击链接**（`/trace-narrate/<文件>` 同源路由），点开即看，不用翻文件夹
 - **内置 5 套 schema**（summary / postmortem / tutorial / debug / executive）+ 自定义（本地路径 / URL / 已保存名）
 - **默认 strict 脱敏**：11 个检测器、确定性占位符、审计日志（只记类别与计数，不含原文）
 - **三种输出**：自包含 HTML（零外部资源）/ Markdown / JSON（便于二次处理）
@@ -51,4 +51,4 @@ git checkout v0.8.0   # 回到任意历史版本
 
 ## 状态
 
-**v1.0.0**：全部里程碑完成（设计 → 脚手架 → 读取压缩 → 脱敏 → schema → LLM 总结 → 渲染 → 命令整合 → 上报 → 收尾）。
+**v1.1.0**：v1.0 全部里程碑 + 报告链接（对话内直接点开）。版本历史见 CHANGELOG。

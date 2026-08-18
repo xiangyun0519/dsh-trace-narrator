@@ -23,6 +23,8 @@ export interface Strings {
   confirmSend: string
   confirmCancel: string
   okMessage: (path: string, redacted: number) => string
+  processSummary: (sessionId: string, events: number, steps: number, redacted: number) => string
+  openReport: (link: string) => string
   uploadOk: string
   uploadFail: (detail: string) => string
   degradedNoLlm: string
@@ -47,6 +49,9 @@ const ZH: Strings = {
   confirmSend: '发送',
   confirmCancel: '取消',
   okMessage: (path, redacted) => `报告已生成：${path}（脱敏 ${redacted} 处）`,
+  processSummary: (sessionId, events, steps, redacted) =>
+    `📋 会话 ${sessionId}：事件 ${events} 条 → 剧本 ${steps} 行 → 脱敏 ${redacted} 处 → 总结完成`,
+  openReport: link => `[📄 打开报告](${link})`,
   uploadOk: '已上传',
   uploadFail: detail => `上传失败：${detail}`,
   degradedNoLlm: '⚠️ 未生成 AI 总结（LLM 不可用或重试耗尽），已输出纯模板报告。',
@@ -71,6 +76,9 @@ const EN: Strings = {
   confirmSend: 'Send',
   confirmCancel: 'Cancel',
   okMessage: (path, redacted) => `Report written: ${path} (${redacted} redacted)`,
+  processSummary: (sessionId, events, steps, redacted) =>
+    `📋 Session ${sessionId}: ${events} events -> ${steps} script lines -> ${redacted} redacted -> summary done`,
+  openReport: link => `[📄 Open report](${link})`,
   uploadOk: 'uploaded',
   uploadFail: detail => `upload failed: ${detail}`,
   degradedNoLlm: '⚠️ No AI summary (LLM unavailable or retries exhausted); template-only report written.',

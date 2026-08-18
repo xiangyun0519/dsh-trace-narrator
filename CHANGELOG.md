@@ -2,6 +2,15 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v1.1.0 — 报告链接（对话内直接点开）
+
+- `src/serve.ts`：`webServer` 前缀路由 `/trace-narrate/<文件名>`（实测契约：`{kind:'prefix', path, handler}`）——同源 HTTP 服务报告；文件名白名单（阻断目录穿越）、仅 .html/.md/.json、no-store
+- `src/narrator.ts` + i18n：命令回复改为「过程摘要 + 本地路径 + `[📄 打开报告](…)` 可点击链接」（相对链接，随 GUI 端口同源）；无 webServer（headless）时回退纯本地路径；上传失败消息同样带链接
+- `src/index.ts`：挂载时注册路由（ctx.effect 生命周期），`serveUrl` 生产接线；报告根目录与写盘共用同一解析（workspaceRoot + outputDir）
+- 测试：188 用例全绿（serve 路由矩阵 10 项 + narrator 链接 3 项）；测试改跑 `--pool=threads`（workspace-write 沙箱禁止 spawn 子进程）
+
+验收：typecheck + 188/188 测试 + 构建通过。
+
 ## v1.0.0 — 发布收尾
 
 - `package.json`：version 1.0.0（包名保持 `dsh-trace-narrator`）

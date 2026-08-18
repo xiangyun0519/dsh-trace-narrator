@@ -56,6 +56,8 @@ export interface NarratorDeps {
     timeoutMs: number,
     body: unknown,
   ) => Promise<void>
+  /** 报告 HTTP 链接（生产 = /trace-narrate/<文件名> 同源路由）；缺省时回复只给本地路径。 */
+  serveUrl?: (filename: string) => string | undefined
   /** $DSH_HOME（schemaDir/audit dir 的兜底根）。 */
   home: string
   workspaceRoot: string
@@ -240,7 +242,8 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
   // 7. 落盘
   const outputDir = resolved.outputDir.length > 0 ? resolved.outputDir : 'trace-narrate'
   const ext = resolved.format === 'md' ? 'md' : resolved.format
-  const outputPath = join(outputDir, `${request.sessionId}-${formatTimestamp(now())}.${ext}`)
+  const reportFilename = `${request.sessionId}-${formatTimestamp(now())}.${ext}`
+  const outputPath = join(outputDir, reportFilename)
   try {
     await deps.writeFile(outputPath, rendered)
   } catch (error) {
@@ -284,26 +287,37 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
       }
     }
     if (uploadNote !== ui.uploadOk && explicitEndpoint !== undefined) {
+      const link = deps.serveUrl?.(reportFilename)
       return {
         kind: 'upload-failed',
         exitCode: 8,
-        message: `${uploadNote} ${ui.okMessage(outputPath, redactor.cumulative().total)}`.trim(),
+        message: [
+          ui.processSummary(request.sessionId, script.meta.eventCount, script.steps.length, redactor.cumulative().total),
+          ui.okMessage(outputPath, redactor.cumulative().total),
+          ...(link === undefined ? [] : [ui.openReport(link)]),
+          uploadNote,
+        ].join('\n'),
         outputPath,
         report,
       }
     }
   }
 
-  const messageParts = [ui.okMessage(outputPath, redactor.cumulative().total)]
+  const link = deps.serveUrl?.(reportFilename)
+  const messageParts = [
+    ui.processSummary(request.sessionId, script.meta.eventCount, script.steps.length, redactor.cumulative().total),
+    ui.okMessage(outputPath, redactor.cumulative().total),
+    ...(link === undefined ? [] : [ui.openReport(link)]),
+  ]
   if (loadedSchema.warnings.length > 0) messageParts.push(ui.schemaWarnings(loadedSchema.warnings.length))
   if (uploadNote !== undefined) messageParts.push(uploadNote)
-  const message = messageParts.join(' ')
+  const message = messageParts.join('\n')
   if (status === 'ok') {
     return { kind: 'ok', message, outputPath, report }
   }
   return {
     kind: 'degraded',
-    message: `${degradedMessage ?? ''} ${message}`.trim(),
+    message: `${degradedMessage ?? ''}\n${message}`.trim(),
     outputPath,
     report,
   }

@@ -335,4 +335,42 @@ describe('narrate：上报', () => {
     await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
     expect(deps.uploads).toEqual([])
   })
+
+  it('显式上传失败的消息里也带链接（本地产物仍在）', async () => {
+    const deps = Object.assign(uploadDeps(() => { throw new Error('down') }), {
+      serveUrl: (f: string) => `/trace-narrate/${f}`,
+    })
+    const outcome = await narrate(deps, {
+      sessionId: 'sess_1',
+      overrides: { confirm: false, uploadEndpoint: 'https://x.com' },
+    })
+    expect(outcome.kind).toBe('upload-failed')
+    if (outcome.kind === 'upload-failed') {
+      expect(outcome.message).toContain('打开报告')
+      expect(outcome.message).toContain('上传失败')
+    }
+  })
+})
+
+describe('narrate：报告链接', () => {
+  it('serveUrl 存在时回复含过程摘要与可点击链接', async () => {
+    const deps = makeDeps({ serveUrl: f => `/trace-narrate/${f}` })
+    const outcome = await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(outcome.kind).toBe('ok')
+    if (outcome.kind === 'ok') {
+      expect(outcome.message).toContain('📋 会话 sess_1')
+      expect(outcome.message).toContain('打开报告')
+      expect(outcome.message).toMatch(/\[📄 打开报告\]\(\/trace-narrate\/sess_1-.*\.html\)/)
+    }
+  })
+
+  it('无 serveUrl 时回复不含链接', async () => {
+    const deps = makeDeps()
+    const outcome = await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(outcome.kind).toBe('ok')
+    if (outcome.kind === 'ok') {
+      expect(outcome.message).not.toContain('打开报告')
+      expect(outcome.message).toContain('📋 会话 sess_1')
+    }
+  })
 })

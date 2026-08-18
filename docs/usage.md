@@ -24,6 +24,7 @@ dsh plugin --profile <profile> add dsh-trace-narrator
 ```
 
 - 默认：当前会话、`summary` schema、`strict` 脱敏、HTML 输出到 `trace-narrate/`（基于会话工作区）。
+- **报告链接**：执行完成后，命令回复里直接给出过程摘要与 `[📄 打开报告](/trace-narrate/<文件名>)` 可点击链接（同源，随当前 GUI 端口），点击即在浏览器打开自包含 HTML；无需去文件夹找文件。
 - `--schema` 解析顺序：内置名（summary/postmortem/tutorial/debug/executive）→ URL（仅 HTTPS，10s/64KB 限制）→ 文件路径 → 已保存名（`$DSH_HOME/schemas/<name>.json`）。
 - 发送前确认：默认弹出「N 事件、已脱敏 M 处，发送？」；`--yes` 跳过；无交互能力的环境必须显式 `--yes`，否则不发送（exit 4）。
 - `--upload <endpoint>`：显式上报；失败时本地产物保留并返回 exit 8。
