@@ -23,6 +23,8 @@ export interface Strings {
   confirmSend: string
   confirmCancel: string
   okMessage: (path: string, redacted: number) => string
+  uploadOk: string
+  uploadFail: (detail: string) => string
   degradedNoLlm: string
   degradedValidation: string
   schemaWarnings: (count: number) => string
@@ -45,6 +47,8 @@ const ZH: Strings = {
   confirmSend: '发送',
   confirmCancel: '取消',
   okMessage: (path, redacted) => `报告已生成：${path}（脱敏 ${redacted} 处）`,
+  uploadOk: '已上传',
+  uploadFail: detail => `上传失败：${detail}`,
   degradedNoLlm: '⚠️ 未生成 AI 总结（LLM 不可用或重试耗尽），已输出纯模板报告。',
   degradedValidation: '⚠️ 总结未通过 schema 校验，原始输出已放入报告附录。',
   schemaWarnings: count => `（schema 有 ${count} 条非致命警告）`,
@@ -67,6 +71,8 @@ const EN: Strings = {
   confirmSend: 'Send',
   confirmCancel: 'Cancel',
   okMessage: (path, redacted) => `Report written: ${path} (${redacted} redacted)`,
+  uploadOk: 'uploaded',
+  uploadFail: detail => `upload failed: ${detail}`,
   degradedNoLlm: '⚠️ No AI summary (LLM unavailable or retries exhausted); template-only report written.',
   degradedValidation: '⚠️ Summary failed schema validation; raw output is in the report appendix.',
   schemaWarnings: count => ` (schema has ${count} non-fatal warnings)`,

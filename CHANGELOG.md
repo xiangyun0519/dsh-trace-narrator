@@ -2,6 +2,18 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v0.9.0 — 上报 + 全管线 golden + 使用文档
+
+- `src/upload.ts`：`uploadReport`——HTTPS-only、Bearer token 从 `authEnv` 环境变量读（禁明文）、`AbortSignal.timeout` 超时、失败包装 `UploadError`
+- 事实修正：`ctx.web.fetch` 仅支持 GET（`WebFetchRequest` 无 method/body）→ POST 上报走宿主全局 fetch（docs/design.md §2 已更新）；schema URL 拉取仍走 ctx.web.fetch
+- `src/args.ts`：`--upload <endpoint>` 显式上报（失败 → exit 8，本地产物保留）
+- `src/narrator.ts`：步骤 9 上报——body `{version:1, report, audit}`；显式失败 → `upload-failed`(8)；配置端点失败 → 警告不阻塞
+- `tests/golden.spec.ts`：全管线 golden（固定事件流+固定 LLM+固定时钟 → HTML/JSON 渲染逐字节快照，提交仓库）
+- `docs/usage.md`：完整使用文档（安装/命令/配置/上报协议/审计/安全模型/已知限制）
+- 测试：175 用例全绿（upload 协议矩阵、narrator 上报 5 路径、golden 4 项）
+
+验收：typecheck + 175/175 测试 + 构建通过 + 2 份 golden 快照入库。
+
 ## v0.8.0 — 命令整合（管线跑通）
 
 - `src/args.ts`：手写参数解析（--key value / --key=value / 布尔 flag / 枚举与数值边界校验）

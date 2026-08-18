@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`全管线 golden > HTML 渲染逐字节确定（快照） 1`] = `
+"<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会话轨迹报告</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; line-height: 1.6; }
+  h1 { border-bottom: 2px solid #8884; padding-bottom: 8px; }
+  h2 { margin-top: 28px; }
+  h3 { margin-top: 20px; font-size: 1.05em; }
+  dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+  dl.meta dt { opacity: .65; }
+  dl.meta dd { margin: 0; }
+  .banner { border: 1px solid #e0b00088; background: #e0b00022; border-radius: 8px; padding: 10px 14px; }
+  pre { background: #8882; border-radius: 8px; padding: 12px; overflow-x: auto; }
+  footer { margin-top: 32px; opacity: .55; font-size: .85em; }
+</style>
+</head>
+<body>
+<header>
+<h1>会话轨迹报告（剧本已截断）</h1>
+<dl class="meta"><dt>会话</dt><dd>sess_golden</dd><dt>时间范围</dt><dd>2024-03-09T16:00:00.000Z — 2024-03-09T16:00:06.000Z</dd><dt>时长</dt><dd>6 秒</dd><dt>事件数</dt><dd>8</dd><dt>截断/丢弃</dt><dd>1</dd><dt>轮数</dt><dd>1</dd><dt>Schema</dt><dd>summary</dd><dt>脱敏强度</dt><dd>strict</dd><dt>生成时间</dt><dd>2024-03-09T16:00:10.000Z</dd></dl>
+</header>
+<main><h2>总结</h2>
+<h3>标题</h3>
+<p>配置密钥到环境文件</p>
+<h3>时长</h3>
+<p>6 秒</p>
+<h3>总结</h3>
+<p>完成了配置写入与验证。</p>
+<h3>关键步骤</h3>
+<ul><li>写入配置</li><li>验证</li></ul>
+<h3>决策</h3>
+<ul><li>本地写入</li></ul>
+<h3>产出</h3>
+<ul><li>配置完成</li></ul></main>
+<footer>由 dsh-trace-narrator 生成</footer>
+</body>
+</html>
+"
+`;
+
+exports[`全管线 golden > JSON 报告逐字节确定（快照） 1`] = `
+{
+  "meta": {
+    "droppedEvents": 1,
+    "endedAt": 1710000006000,
+    "eventCount": 8,
+    "generatedAt": 1710000010000,
+    "lang": "zh-CN",
+    "redactLevel": "strict",
+    "schemaName": "summary",
+    "sessionId": "sess_golden",
+    "startedAt": 1710000000000,
+    "truncated": true,
+    "turns": 1,
+  },
+  "status": "ok",
+  "summary": {
+    "decisions": [
+      "本地写入",
+    ],
+    "duration": "6 秒",
+    "key_steps": [
+      "写入配置",
+      "验证",
+    ],
+    "outcomes": [
+      "配置完成",
+    ],
+    "summary": "完成了配置写入与验证。",
+    "title": "配置密钥到环境文件",
+  },
+}
+`;

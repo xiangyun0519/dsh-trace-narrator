@@ -17,6 +17,8 @@ export interface NarrateOverrides {
   maxTokens?: number
   /** --yes / --no-confirm 均置为 false（跳过确认）。 */
   confirm?: boolean
+  /** --upload <endpoint>：显式上报；失败 → exit 8（本地产物仍保留）。 */
+  uploadEndpoint?: string
 }
 
 export type ParsedArgs =
@@ -27,7 +29,7 @@ const LANGS: readonly Lang[] = ['zh-CN', 'en', 'ja']
 const REDACT_LEVELS: readonly RedactLevel[] = ['off', 'minimal', 'standard', 'strict']
 const FORMATS: readonly OutputFormat[] = ['html', 'md', 'json']
 
-const VALUE_FLAGS = new Set(['--schema', '--lang', '--redact', '--format', '--output', '--token-budget', '--max-tokens'])
+const VALUE_FLAGS = new Set(['--schema', '--lang', '--redact', '--format', '--output', '--token-budget', '--max-tokens', '--upload'])
 const BOOL_FLAGS = new Set(['--yes', '--no-confirm', '--help'])
 
 export function parseArgs(rawInput: string): ParsedArgs {
@@ -58,6 +60,10 @@ export function parseArgs(rawInput: string): ParsedArgs {
       case '--output':
         if (value.length === 0) errors.push('--output 不能为空')
         else overrides.outputDir = value
+        break
+      case '--upload':
+        if (value.length === 0) errors.push('--upload 不能为空')
+        else overrides.uploadEndpoint = value
         break
       case '--token-budget': {
         const n = Number(value)

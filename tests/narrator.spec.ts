@@ -265,3 +265,74 @@ describe('narrate：参数与标题', () => {
     if (outcome.kind === 'ok') expect(outcome.message).toContain('非致命警告')
   })
 })
+
+describe('narrate：上报', () => {
+  interface Uploaded { endpoint: string; authEnv: string | undefined; timeoutMs: number; body: unknown }
+  const uploadDeps = (behavior?: (u: Uploaded) => void): TestDeps & { uploads: Uploaded[] } => {
+    const uploads: Uploaded[] = []
+    const deps = makeDeps({
+      upload: async (endpoint, authEnv, timeoutMs, body) => {
+        uploads.push({ endpoint, authEnv, timeoutMs, body })
+        behavior?.({ endpoint, authEnv, timeoutMs, body })
+      },
+    }) as TestDeps & { uploads: Uploaded[] }
+    deps.uploads = uploads
+    return deps
+  }
+
+  it('显式 --upload 成功 → 消息含「已上传」，body 含 report 与 audit 且无 secret', async () => {
+    const deps = uploadDeps()
+    const outcome = await narrate(deps, {
+      sessionId: 'sess_1',
+      overrides: { confirm: false, uploadEndpoint: 'https://viewer.example.com' },
+    })
+    expect(outcome.kind).toBe('ok')
+    if (outcome.kind === 'ok') expect(outcome.message).toContain('已上传')
+    const uploaded = deps.uploads[0]
+    expect(uploaded?.endpoint).toBe('https://viewer.example.com')
+    const body = uploaded?.body as { version: number; report: object; audit: object }
+    expect(body.version).toBe(1)
+    expect(body.report).toBeDefined()
+    expect(body.audit).toBeDefined()
+    expect(JSON.stringify(body)).not.toContain(SECRET)
+  })
+
+  it('显式 --upload 失败 → exit 8，本地产物保留', async () => {
+    const deps = uploadDeps(() => { throw new Error('HTTP 500') })
+    const outcome = await narrate(deps, {
+      sessionId: 'sess_1',
+      overrides: { confirm: false, uploadEndpoint: 'https://viewer.example.com' },
+    })
+    expect(outcome.kind).toBe('upload-failed')
+    if (outcome.kind === 'upload-failed') {
+      expect(outcome.exitCode).toBe(8)
+      expect(outcome.message).toContain('上传失败')
+      expect(outcome.message).toContain('HTTP 500')
+    }
+    expect(deps.written.length).toBe(1)
+  })
+
+  it('配置端点（非显式）成功 → ok + 已上传', async () => {
+    const deps = uploadDeps()
+    deps.config.upload = { endpoint: 'https://cfg.example.com', authEnv: 'TOKEN', timeoutMs: 15000 }
+    const outcome = await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(outcome.kind).toBe('ok')
+    if (outcome.kind === 'ok') expect(outcome.message).toContain('已上传')
+    expect(deps.uploads[0]?.authEnv).toBe('TOKEN')
+  })
+
+  it('配置端点（非显式）失败 → 仍 ok，消息带警告', async () => {
+    const deps = uploadDeps(() => { throw new Error('down') })
+    deps.config.upload = { endpoint: 'https://cfg.example.com', authEnv: '', timeoutMs: 15000 }
+    const outcome = await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(outcome.kind).toBe('ok')
+    if (outcome.kind === 'ok') expect(outcome.message).toContain('上传失败')
+    expect(deps.written.length).toBe(1)
+  })
+
+  it('无上传目标 → 不触发上传', async () => {
+    const deps = uploadDeps()
+    await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(deps.uploads).toEqual([])
+  })
+})

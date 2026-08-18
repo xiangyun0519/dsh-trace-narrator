@@ -32,7 +32,7 @@
 | LLM 结构化输出（评审修正） | `GenerateOptions` **无** response-format 字段 → 方案改为「提示词约束 JSON + 提取 + ajv 校验 + ≤2 次重试」 |
 | 发送前确认（评审修正） | 用 **`ctx.userQuestions.ask()`**；仅 live runtime root 可交互，非交互环境必须 `--yes`，默认不发送 |
 | 输出文件（评审修正） | 走 **`ctx.fs.writeText`**（尊重部署沙箱与 `workspaceRoot`），不用裸 Node `fs` |
-| 上传（评审修正） | 走 **`ctx.web.fetch`**（受部署网络策略 gate），不用裸 `fetch` |
+| 上传（评审修正，v0.9.0 再修正） | `ctx.web.fetch` 实测仅支持 GET（`WebFetchRequest` 只有 `url`）→ POST 上报走**宿主全局 fetch**；协议不变：HTTPS-only、Bearer token 从 `upload.authEnv` 环境变量读（禁明文）、超时 15s、失败不阻塞本地产物 |
 
 ## 3. 运行时集成地图（全部实测）
 

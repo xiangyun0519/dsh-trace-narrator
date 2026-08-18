@@ -46,6 +46,8 @@ export * from './renderer/index.ts'
 export * from './args.ts'
 export * from './i18n/index.ts'
 export * from './narrator.ts'
+// v0.9.0：opt-in 上报协议。
+export * from './upload.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')
@@ -64,6 +66,7 @@ import { narrate } from './narrator.ts'
 import type { NarratorDeps } from './narrator.ts'
 import { strings } from './i18n/index.ts'
 import type { UiLang } from './i18n/index.ts'
+import { uploadReport } from './upload.ts'
 
 // ---- 生产服务的结构契约（避免引入 @deepseek-ai/dsh-* 运行时依赖）----
 
@@ -208,6 +211,7 @@ export class TraceNarratorService extends Service {
         case 'degraded': return { kind: 'success', text: `[exit 5] ${outcome.message}` }
         case 'cancelled': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
         case 'error': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
+        case 'upload-failed': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
         /* v8 ignore next -- 封闭联合 */
         default: return { kind: 'error', text: '[exit 2] 未知结果' }
       }
@@ -321,6 +325,28 @@ export class TraceNarratorService extends Service {
         mkdirSync(dirname(absolute), { recursive: true })
         writeFileSync(absolute, content, 'utf8')
       },
+      // 宿主全局 fetch POST（HTTPS-only + authEnv 校验在 upload.ts）；
+      // ctx.web.fetch 仅支持 GET，故上报不走 web 服务。
+      ...(typeof fetch !== 'function' ? {} : {
+        upload: async (endpoint, authEnv, timeoutMs, body) => {
+          await uploadReport(
+            {
+              env: name => process.env[name],
+              postJson: async (url, payload, options) => {
+                const response = await fetch(url, {
+                  method: 'POST',
+                  headers: options.headers,
+                  body: JSON.stringify(payload),
+                  signal: options.signal,
+                })
+                if (!response.ok) throw new Error(`HTTP ${response.status}`)
+              },
+            },
+            { endpoint, authEnv, timeoutMs },
+            body,
+          )
+        },
+      }),
       ...(config.audit.enabled ? {
         auditWriter: createFileAuditWriter(
           config.audit.dir.length > 0 ? config.audit.dir : join(home, 'trace-narrator'),

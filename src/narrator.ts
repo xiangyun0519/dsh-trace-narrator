@@ -49,6 +49,13 @@ export interface NarratorDeps {
   /** 缺省 → 降级模板报告。 */
   writeFile(path: string, content: string): Promise<void>
   auditWriter?: AuditWriter
+  /** 上报通道（生产适配见 index.ts：宿主 fetch POST，HTTPS-only）；缺省时配置了端点 → 记失败。 */
+  upload?: (
+    endpoint: string,
+    authEnv: string | undefined,
+    timeoutMs: number,
+    body: unknown,
+  ) => Promise<void>
   /** $DSH_HOME（schemaDir/audit dir 的兜底根）。 */
   home: string
   workspaceRoot: string
@@ -64,6 +71,7 @@ export interface NarrateRequest {
 export type NarrateOutcome =
   | { kind: 'ok'; message: string; outputPath: string; report: NarratedReport }
   | { kind: 'degraded'; message: string; outputPath: string; report: NarratedReport }
+  | { kind: 'upload-failed'; exitCode: 8; message: string; outputPath: string; report: NarratedReport }
   | { kind: 'cancelled'; exitCode: 4; message: string }
   | { kind: 'error'; exitCode: 2 | 3 | 6 | 7; message: string }
 
@@ -241,22 +249,61 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
 
   // 8. 审计（confirmed=false 时也记预览统计——用户取消路径在第 3 步已写）
   const sent = status === 'ok'
+  const auditEntry = buildAuditEntry(request.sessionId, redactor.cumulative(), confirmed || bypassConfirm, sent)
   if (deps.auditWriter !== undefined && resolved.audit.enabled) {
     try {
-      deps.auditWriter.write(buildAuditEntry(request.sessionId, redactor.cumulative(), confirmed || bypassConfirm, sent))
+      deps.auditWriter.write(auditEntry)
     } catch {
       // 审计失败不阻塞报告产物。
     }
   }
 
-  const warningsSuffix = loadedSchema.warnings.length > 0 ? ` ${ui.schemaWarnings(loadedSchema.warnings.length)}` : ''
-  const okMessage = ui.okMessage(outputPath, redactor.cumulative().total)
+  // 9. opt-in 上报（docs/design.md §4 步骤 11；显式 --upload 失败 → exit 8，本地产物保留）
+  const configUpload = resolved.upload
+  const explicitEndpoint = request.overrides.uploadEndpoint
+  const uploadTarget = explicitEndpoint !== undefined
+    ? {
+        endpoint: explicitEndpoint,
+        authEnv: typeof configUpload === 'object' ? configUpload.authEnv : undefined,
+        timeoutMs: typeof configUpload === 'object' ? configUpload.timeoutMs : 15000,
+      }
+    : typeof configUpload === 'object' && configUpload.endpoint.length > 0
+      ? { endpoint: configUpload.endpoint, authEnv: configUpload.authEnv, timeoutMs: configUpload.timeoutMs }
+      : undefined
+  let uploadNote: string | undefined
+  if (uploadTarget !== undefined) {
+    const uploadBody = { version: 1, report, audit: auditEntry }
+    if (deps.upload === undefined) {
+      uploadNote = ui.uploadFail('无上传通道')
+    } else {
+      try {
+        await deps.upload(uploadTarget.endpoint, uploadTarget.authEnv, uploadTarget.timeoutMs, uploadBody)
+        uploadNote = ui.uploadOk
+      } catch (error) {
+        uploadNote = ui.uploadFail(String(error))
+      }
+    }
+    if (uploadNote !== ui.uploadOk && explicitEndpoint !== undefined) {
+      return {
+        kind: 'upload-failed',
+        exitCode: 8,
+        message: `${uploadNote} ${ui.okMessage(outputPath, redactor.cumulative().total)}`.trim(),
+        outputPath,
+        report,
+      }
+    }
+  }
+
+  const messageParts = [ui.okMessage(outputPath, redactor.cumulative().total)]
+  if (loadedSchema.warnings.length > 0) messageParts.push(ui.schemaWarnings(loadedSchema.warnings.length))
+  if (uploadNote !== undefined) messageParts.push(uploadNote)
+  const message = messageParts.join(' ')
   if (status === 'ok') {
-    return { kind: 'ok', message: `${okMessage}${warningsSuffix}`, outputPath, report }
+    return { kind: 'ok', message, outputPath, report }
   }
   return {
     kind: 'degraded',
-    message: `${degradedMessage ?? ''} ${okMessage}${warningsSuffix}`.trim(),
+    message: `${degradedMessage ?? ''} ${message}`.trim(),
     outputPath,
     report,
   }
