@@ -30,6 +30,9 @@ export * from './schemas/validate.ts'
 // v0.6.0：LLM 流收集与总结编排（docs/design.md §6 注入防护 + §7 降级）。
 export * from './llm/collect.ts'
 export * from './summarizer.ts'
+// v0.7.0：报告模型与渲染器（HTML/MD/JSON，全量转义）。
+export * from './report.ts'
+export * from './renderer/index.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')

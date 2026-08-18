@@ -2,6 +2,19 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v0.7.0 — 渲染器
+
+- `src/report.ts`：`NarratedReport` 报告模型（meta / status：ok|no-llm|validation-failed / summary / rawOutput / errors），narrator 与 renderer 的唯一接口
+- `src/renderer/escape.ts`：`escapeHtml`（& < > " ' 全量）+ `safeCodeFence`（围栏长度 > 内容最长反引号段，防 MD 围栏逃逸）
+- `src/renderer/html.ts`：自包含 HTML（内联样式、零外部资源）；**任何动态文本都过 escapeHtml**，schema 校验不承担注入防护
+- `src/renderer/markdown.ts`：字段小节 + 列表 + 原始输出防逃逸围栏
+- `src/renderer/json.ts`：meta + 状态 + summary + rawOutput/errors 直出
+- `src/renderer/common.ts`：chrome（zh/en，ja 回退 zh）+ 内置字段标题表 + 值形态 + 时长格式化
+- 结构说明：设计树中的 `templates/report.html` 改为代码内嵌模板（避免模板文件与代码漂移；files 打包面不变）
+- 测试：131 用例全绿（XSS 注入矩阵、围栏逃逸、降级横幅、JSON 往返、确定性）
+
+验收：typecheck + 131/131 测试 + 构建通过。
+
 ## v0.6.0 — LLM 总结
 
 - `src/llm/collect.ts`：`collectStreamText`——拼接 text-delta、忽略 reasoning/tool-call/块结构、usage 透传、error/aborted finish 抛 `LlmStreamError`（StreamChunk 形态实测 pin）
