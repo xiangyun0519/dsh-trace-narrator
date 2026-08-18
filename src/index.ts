@@ -16,6 +16,11 @@ import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 // Type-only：合并 ctx.commands 的 Context 声明（ctx.commands.register）。
 import type {} from '@deepseek-ai/dsh-commands'
 
+// v0.3.0：剧本格式、会话读取、投影与预算截断（详见 docs/design.md §4-5）。
+export * from './script.ts'
+export * from './reader.ts'
+export * from './compressor.ts'
+
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')
 
