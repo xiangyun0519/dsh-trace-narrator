@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["goal", "result", "highlights", "risks"],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "description": "本次会话要达成的目标，一句话"
+    },
+    "result": {
+      "type": "string",
+      "description": "最终结果：成功/部分成功/失败，并说明产出"
+    },
+    "highlights": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "maxItems": 8,
+      "description": "值得记住的亮点列表"
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 8,
+      "description": "遗留风险与未完成事项；没有则为空数组"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "可选的量化指标",
+      "properties": {
+        "files": { "type": "number", "description": "改动文件数" },
+        "hours": { "type": "number", "description": "耗时（小时）" }
+      }
+    }
+  }
+}

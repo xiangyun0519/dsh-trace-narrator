@@ -2,6 +2,15 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v1.0.0 — 发布收尾
+
+- `package.json`：version 1.0.0（包名保持 `dsh-trace-narrator`）
+- `README.md`：定稿（特性/快速开始/文档/开发/版本回滚）
+- `examples/custom-schema.json`：自定义 schema 示例（含嵌套 object 字段）
+- 发布检查：175/175 测试、typecheck、构建、`pack --dry-run` 打包面（cordis.patch.yml + lib/ + README，无源码泄漏）、测试 profile 产物加载验证
+
+首个完整版本：设计（v0.1）→ 脚手架（v0.2）→ 读取压缩（v0.3）→ 脱敏（v0.4）→ schema（v0.5）→ LLM 总结（v0.6）→ 渲染（v0.7）→ 命令整合（v0.8）→ 上报+golden（v0.9）→ 发布（v1.0）。
+
 ## v0.9.0 — 上报 + 全管线 golden + 使用文档
 
 - `src/upload.ts`：`uploadReport`——HTTPS-only、Bearer token 从 `authEnv` 环境变量读（禁明文）、`AbortSignal.timeout` 超时、失败包装 `UploadError`
