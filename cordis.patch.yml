@@ -1,0 +1,33 @@
+# dsh-trace-narrator 插件行。
+# 本包声明 dsh.bundle.patch = ./cordis.patch.yml；安装进 profile 后按
+# dsh.profile.bundles 顺序应用本层。
+#
+# insert 行携带「完整默认值」是刻意选择：loader 对无 config 行的行为未验证，
+# 显式写出全部字段保证任何部署收到的都是合法配置（static Config 校验）。
+# 部署级覆盖（profile 自己的 cordis.patch.yml，整体替换不合并）：
+#   - id: trace-narrator
+#     config: { redact: minimal }
+# 禁用本行：
+#   - id: trace-narrator
+#     disabled: true
+#
+# 优先级：schema 默认 < 本行 config < 用户设置 < CLI 参数（v0.8.0 起）。
+- insert:
+    - id: trace-narrator
+      name: dsh-trace-narrator
+      config:
+        lang: zh-CN
+        schema: summary
+        redact: strict
+        format: html
+        outputDir: trace-narrate
+        tokenBudget: 12000
+        maxTokens: 2048
+        confirmBeforeSend: true
+        schemaDir: ''
+        audit:
+          enabled: true
+          dir: ''
+          maxBytes: 1048576
+          keep: 3
+        upload: false

@@ -9,4 +9,12 @@ DeepSeek Harness 插件：把 dsh 最被称赞的 trajectory 特性从本地私�
 
 ## 状态
 
-设计定稿（v0.1.0）。实现按里程碑推进：`docs/design.md` §13。
+设计定稿（v0.1.0）；脚手架完成（v0.2.0，可安装、命令已注册）。实现按里程碑推进：`docs/design.md` §13。
+
+```bash
+# 本地开发：安装进任意 profile（link，随源码变化）
+dsh plugin --profile <profile> add ../dsh-trace-narrator
+
+# 命令
+/trace-narrate [sessionId] [--schema …] [--redact …] [--format html|md|json] [--yes]
+```
