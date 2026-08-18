@@ -20,45 +20,16 @@ import type {} from '@deepseek-ai/dsh-commands'
 export * from './script.ts'
 export * from './reader.ts'
 export * from './compressor.ts'
+// v0.4.0：脱敏管线与审计日志（docs/redaction.md）。
+export * from './redaction/index.ts'
+export * from './redaction/audit.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')
 
-export type Lang = 'zh-CN' | 'en' | 'ja'
-export type RedactLevel = 'off' | 'minimal' | 'standard' | 'strict'
-export type OutputFormat = 'html' | 'md' | 'json'
-
-export interface AuditConfig {
-  enabled: boolean
-  /** 空串 = 运行时解析为 $DSH_HOME/trace-narrator */
-  dir: string
-  maxBytes: number
-  keep: number
-}
-
-export interface UploadConfig {
-  /** HTTPS 端点；token 一律从 authEnv 指定的环境变量读取 */
-  endpoint: string
-  authEnv: string
-  timeoutMs: number
-}
-
-/** 完整配置面（docs/design.md §7）。 */
-export interface TraceNarratorConfig {
-  lang: Lang
-  schema: string
-  redact: RedactLevel
-  format: OutputFormat
-  outputDir: string
-  tokenBudget: number
-  maxTokens: number
-  confirmBeforeSend: boolean
-  /** 空串 = 运行时解析为 $DSH_HOME/schemas */
-  schemaDir: string
-  audit: AuditConfig
-  /** false = 关闭上传（默认，绝不联网） */
-  upload: false | UploadConfig
-}
+// 共享配置类型（src/config.ts），保持 v0.2.0 起的包根导出面。
+import type { TraceNarratorConfig } from './config.ts'
+export type * from './config.ts'
 
 /**
  * 构建一份独立的 schemastery schema 实例。

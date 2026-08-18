@@ -2,6 +2,16 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v0.4.0 — 脱敏管线
+
+- `src/config.ts`：共享配置类型抽取（Lang/RedactLevel/OutputFormat/AuditConfig/UploadConfig/TraceNarratorConfig），index 保持导出面兼容
+- `src/redaction/detectors.ts`：11 个检测器（pem / json-secrets / urls-token / connection-strings / api-keys / api-keys-assign / jwt / emails / ips / paths / files），执行顺序 = 表序
+- `src/redaction/index.ts`：`createRedactor`——确定性占位符（sha256 前 8 位，映射只存内存）、累计报告、`redactScript`（seq 归因，最多 20 位置）/`redactText`（输出物二次脱敏）
+- `src/redaction/audit.ts`：审计条目构建 + JSONL 文件写入器（1MB 轮转 `audit.N.jsonl`、0600 尽力而为）；**API 类型层面无法传入原文**
+- 测试：54 用例全绿（检测器 golden fixtures、级别矩阵、确定性、不可变性、审计轮转、日志不含原文不变量）
+
+验收：typecheck + 54/54 测试 + 构建通过。
+
 ## v0.3.0 — 事件读取 + 投影压缩
 
 - `src/script.ts`：剧本格式（Script/ScriptStep/ScriptMeta）、固定密度 token 估算（chars/4，与 `@deepseek-ai/dsh-token-meter` 启发式一致）、zh/en chrome
