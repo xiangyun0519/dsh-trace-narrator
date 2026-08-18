@@ -27,6 +27,9 @@ export * from './redaction/audit.ts'
 export * from './schemas/builtin.ts'
 export * from './schemas/loader.ts'
 export * from './schemas/validate.ts'
+// v0.6.0：LLM 流收集与总结编排（docs/design.md §6 注入防护 + §7 降级）。
+export * from './llm/collect.ts'
+export * from './summarizer.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')
