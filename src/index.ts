@@ -23,6 +23,10 @@ export * from './compressor.ts'
 // v0.4.0：脱敏管线与审计日志（docs/redaction.md）。
 export * from './redaction/index.ts'
 export * from './redaction/audit.ts'
+// v0.5.0：内置 schema、自定义加载、输出校验（docs/schemas.md）。
+export * from './schemas/builtin.ts'
+export * from './schemas/loader.ts'
+export * from './schemas/validate.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')

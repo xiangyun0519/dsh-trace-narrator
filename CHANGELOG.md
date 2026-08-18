@@ -2,6 +2,16 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v0.5.0 — Schema 体系与输出校验
+
+- `src/schemas/builtin.ts`：5 套内置 schema（summary/postmortem/tutorial/debug/executive，draft 2020-12，description 面向提示词）
+- `src/schemas/loader.ts`：四级解析（内置名 → URL → 路径 → 已保存名）+ 结构安全检查（HTTPS-only、10s 超时、≤64KB、拒绝 `$ref`、深度 ≤5、≤30 顶层字段、缺 type/description 记警告）+ 进程级缓存（每次返回 fresh 深拷贝，防污染）
+- `src/schemas/validate.ts`：剥围栏 → 提取 JSON（首 `{` 到末 `}`）→ 删未知键（additionalProperties:false 语义）→ ajv 2020-12 严格校验；错误文本附 keyword（重试回喂用）
+- 依赖：新增 `ajv`（runtime，external 不打包）
+- 测试：100 用例全绿（loader 安全边界、URL 限制、缓存语义、5 套 golden 样本、校验错误格式）
+
+验收：typecheck + 100/100 测试 + 构建通过。
+
 ## v0.4.0 — 脱敏管线
 
 - `src/config.ts`：共享配置类型抽取（Lang/RedactLevel/OutputFormat/AuditConfig/UploadConfig/TraceNarratorConfig），index 保持导出面兼容
