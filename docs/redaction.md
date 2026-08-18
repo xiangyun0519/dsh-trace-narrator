@@ -33,7 +33,7 @@
 | api-keys-assign | `/(?:api[_-]?key\|apikey\|secret\|token\|password\|passwd)\s*[:=]\s*['"]?([A-Za-z0-9._~+/=-]{12,})/gi` | 仅替换捕获组 1 → `[REDACTED:API_KEY:<h>]` |
 | jwt | `/eyJ[A-Za-z0-9_-]{6,}\.eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g` | 整体 → `[REDACTED:JWT:<h>]` |
 | emails | `/[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g` | 仅替换本地部分 → `[REDACTED:EMAIL:<h>]@域名`（保留域名保持可读性） |
-| ips | IPv4：`/(?<!\d)(?:25[0-5]\|2[0-4]\d\|1?\d?\d)(?:\.(?:25[0-5]\|2[0-4]\d\|1?\d?\d)){3}(?!\d)/g`；IPv6（近似）：`/(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}/g` | 整体 → `[REDACTED:IP:<h>]` |
+| ips | IPv4：`/(?<!\d)(?:25[0-5]\|2[0-4]\d\|1?\d?\d)(?:\.(?:25[0-5]\|2[0-4]\d\|1?\d?\d)){3}(?!\d)/g`；IPv6（近似）：`/(?:[0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{0,4}/g`（要求 ≥3 个冒号：全形 7、MAC 5，而时间 HH:MM:SS 只有 2 个必须放过） | 整体 → `[REDACTED:IP:<h>]` |
 | paths | unix：`/\/home\/[A-Za-z0-9._-]+(?=[\/\s"'<])/g`；windows：`/[A-Za-z]:\\Users\\[A-Za-z0-9._-]+(?=[\\\s"'<])/gi` | unix → `~`；windows → `%USERPROFILE%`（无需 hash：用户名本身即敏感） |
 | files | `/\b\.env\b/gi`；`/id_rsa(?:\.pub)?/g`；`/id_ed25519(?:\.pub)?/g`；`/\.pem\b/gi`；`/\.key\b/gi`；`/\bkubeconfig\b/gi`；`/\.git-credentials\b/gi`；`/\bcredentials\.json\b/gi` | 文件名 → `[REDACTED:FILE]`（无 hash：文件名不是 secret，是标记） |
 

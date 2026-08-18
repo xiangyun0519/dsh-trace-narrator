@@ -204,7 +204,8 @@ export const DETECTORS: readonly Detector[] = [
         count += 1
         return redact(match)
       })
-      out = out.replace(/(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}/g, match => {
+      // IPv6 近似：要求 ≥3 个冒号（全形 7、MAC 5；时间 HH:MM:SS 只有 2 个，必须放过）。
+      out = out.replace(/(?:[0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{0,4}/g, match => {
         count += 1
         return redact(match)
       })

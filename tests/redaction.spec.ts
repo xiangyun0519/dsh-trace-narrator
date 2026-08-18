@@ -64,6 +64,12 @@ describe('检测器（strict 默认）', () => {
     expect(redact('addr 2001:db8:85a3:8d3:1319:8a2e:370:7348')).not.toContain('2001:')
   })
 
+  it('ips：ISO 时间戳（HH:MM:SS）不被 IPv6 近似检测器误伤', () => {
+    const out = redact('时间范围：1970-01-01T00:00:01.000Z — 1970-01-01T00:00:04.000Z')
+    expect(out).toContain('1970-01-01T00:00:01.000Z')
+    expect(out).not.toContain('[REDACTED:IP:')
+  })
+
   it('urls-token：只换参数值，保留其它参数', () => {
     const out = redact('https://x.com/a?token=abc123secret456&b=2&c=ok')
     expect(out).toContain('?token=[REDACTED:URL_TOKEN:')

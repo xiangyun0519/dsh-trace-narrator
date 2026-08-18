@@ -2,6 +2,21 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v0.8.0 — 命令整合（管线跑通）
+
+- `src/args.ts`：手写参数解析（--key value / --key=value / 布尔 flag / 枚举与数值边界校验）
+- `src/i18n/index.ts`：zh/en 命令文案（确认问题、错误、用法；ja 复用 zh）
+- `src/narrator.ts`：全管线编排（纯 DI，无 DSH 依赖）：
+  `读取 → projectSteps → redact → applyBudget → 发送前确认 → 加载 schema → summarize（重试/降级）→ 组装报告 → 渲染 → 二次脱敏 → 落盘 → 审计`
+  退出码 2/3/4/5/6/7 全覆盖；确认取消/非交互/abort → 4；LLM 不可用 → degraded(no-llm)；校验耗尽 → degraded(validation-failed) + 转义附录
+- `src/index.ts` 重写：真实命令 handler + 生产适配器
+  （ctx.sessionQuery / ctx.llm.prepareCall+stream / ctx.userQuestions / ctx.fs.resolve+processPath / ctx.web.fetch / ctx.agentDefaultModel / ctx.sandboxPolicy.workspaceRoot / $DSH_HOME 解析）
+- 修复安全误报：IPv6 近似检测器把 ISO 时间戳（HH:MM:SS，2 个冒号）当地址脱敏 → 要求 ≥3 个冒号（全形 IPv6 7、MAC 5），配回归测试
+- 测试：158 用例全绿（narrator 全假依赖端到端：成功/取消/非交互/降级/错误码/二次脱敏/审计语义）
+- 加载验证：测试 profile 合法配置静默挂载 ✓，非法配置精确报错 ✓（bundle 层 + static Config 链路）
+
+验收：typecheck + 158/158 测试 + 构建通过 + 测试 profile 双向 boot 验证。
+
 ## v0.7.0 — 渲染器
 
 - `src/report.ts`：`NarratedReport` 报告模型（meta / status：ok|no-llm|validation-failed / summary / rawOutput / errors），narrator 与 renderer 的唯一接口
