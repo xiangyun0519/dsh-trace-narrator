@@ -12,6 +12,8 @@
 
 验收：typecheck + 196/196 测试 + 构建通过。
 
+> v1.2.1 文档补充：在 Mavis / MiniMax Code 里新增了 `dsh-trace-narrator` skill（不修改本插件代码，dsh 端 `/trace-narrate` 保持不变），用户可从 Mavis 对话触发。
+
 ## v1.1.0 — 报告链接（对话内直接点开）
 
 - `src/serve.ts`：`webServer` 前缀路由 `/trace-narrate/<文件名>`（实测契约：`{kind:'prefix', path, handler}`）——同源 HTTP 服务报告；文件名白名单（阻断目录穿越）、仅 .html/.md/.json、no-store

@@ -14,6 +14,12 @@ dsh plugin --profile <profile> add dsh-trace-narrator
 
 重启 dsh 后生效。命令 `/trace-narrate` 出现在任意会话中。
 
+### 1.1 从 Mavis 调用（v1.2.0+）
+
+在 MiniMax Code / Mavis 环境里，可以通过 `dsh-trace-narrator` skill 直接从对话触发本插件的 `/trace-narrate`，Mavis UI 会显式显示「loading skill: dsh-trace-narrator」。dsh 端的斜杠命令不受影响，两条入口共用同一份 plugin 核心。
+
+> ⚠️ 冷启动成本：`dsh --profile <name> "..."` 每次冷启动 ≥ 5 分钟。Mavis bash 工具调起时务必把 timeout 调到 15 分钟。
+
 ## 2. 命令
 
 ```

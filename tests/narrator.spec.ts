@@ -113,9 +113,11 @@ describe('narrate：成功路径', () => {
       key_steps: ['a'], decisions: [], outcomes: [],
     })
     const deps = makeDeps({ llm: { async call() { return evil } } })
-    await narrate(deps, { sessionId: 'sess_1', overrides: {} })
+    const outcome = await narrate(deps, { sessionId: 'sess_1', overrides: {} })
     expect(deps.written[0]?.content).not.toContain(SECRET)
     expect(deps.written[0]?.content).toContain('[REDACTED:API_KEY:')
+    expect(JSON.stringify(outcome)).not.toContain(SECRET)
+    expect(deps.inboxMessages.join('\n')).not.toContain(SECRET)
   })
 
   it('--yes 跳过确认（无 questions 也可）', async () => {
@@ -138,6 +140,7 @@ describe('narrate：确认流程', () => {
     expect(calls).toEqual([])
     expect(deps.written).toEqual([])
     expect(deps.auditLines[0]).toMatchObject({ confirmed: false, sent: false })
+    expect(deps.inboxMessages).toEqual([])
     expect(deps.asked[0]?.question).toContain('sess_1')
     expect(deps.asked[0]?.question).toContain('已脱敏')
   })
@@ -188,6 +191,7 @@ describe('narrate：错误与降级', () => {
     }
     expect(deps.written.length).toBe(1)
     expect(deps.auditLines[0]).toMatchObject({ confirmed: true, sent: false })
+    expect(deps.inboxMessages).toEqual([])
   })
 
   it('校验始终失败 → degraded（validation-failed）+ 转义附录', async () => {
@@ -301,6 +305,20 @@ describe('narrate：上报', () => {
     expect(JSON.stringify(body)).not.toContain(SECRET)
   })
 
+  it('LLM output is redacted before explicit upload', async () => {
+    const evil = JSON.stringify({
+      title: `key=${SECRET}`, duration: '1 minute', summary: 'repeated secret',
+      key_steps: ['a'], decisions: [], outcomes: [],
+    })
+    const deps = uploadDeps()
+    deps.llm = { async call() { return evil } }
+    await narrate(deps, {
+      sessionId: 'sess_1',
+      overrides: { confirm: false, uploadEndpoint: 'https://viewer.example.com' },
+    })
+    expect(JSON.stringify(deps.uploads[0]?.body)).not.toContain(SECRET)
+  })
+
   it('显式 --upload 失败 → exit 8，本地产物保留', async () => {
     const deps = uploadDeps(() => { throw new Error('HTTP 500') })
     const outcome = await narrate(deps, {
@@ -312,6 +330,7 @@ describe('narrate：上报', () => {
       expect(outcome.exitCode).toBe(8)
       expect(outcome.message).toContain('上传失败')
       expect(outcome.message).toContain('HTTP 500')
+      expect(outcome.message.split('\n')[0]).toContain('上传失败')
     }
     expect(deps.written.length).toBe(1)
   })
@@ -393,19 +412,30 @@ describe('narrate：对话式 inbox 注入', () => {
     expect(post).toContain('存到项目知识库')
   })
 
-  it('读会话后注入 pre 通知', async () => {
-    const deps = makeDeps()
-    await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+  it('成功后注入 pre 通知，且提示实际生效的配置', async () => {
+    const deps = makeDeps({
+      llm: { async call() {
+        return JSON.stringify({ incident: 'x', timeline: ['1'], root_cause: 'x', fix: 'x', lessons: ['x'] })
+      } },
+    })
+    await narrate(deps, {
+      sessionId: 'sess_1',
+      overrides: { confirm: false, schema: 'postmortem', redact: 'minimal', format: 'md' },
+    })
     const pre = deps.inboxMessages.find(m => m.startsWith('[pre]'))
     expect(pre).toBeDefined()
     expect(pre).toContain('sess_1')
     expect(pre).toContain('插件通知')
+    expect(pre).toContain('postmortem')
+    expect(pre).toContain('minimal')
+    expect(pre).toContain('Markdown')
   })
 
   it('降级（无 llm）不注入 post（无 summary 可复述）', async () => {
     const deps = makeDeps({ llm: undefined, model: undefined })
     await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
     expect(deps.inboxMessages.filter(m => m.startsWith('[post]')).length).toBe(0)
+    expect(deps.inboxMessages).toEqual([])
   })
 
   it('英文场景：post 消息含 English chrome', async () => {
@@ -416,5 +446,13 @@ describe('narrate：对话式 inbox 注入', () => {
     const post = deps.inboxMessages.find(m => m.startsWith('[post]'))
     expect(post).toContain('conversation model')
     expect(post).toContain('Report:')
+  })
+
+  it('inbox 注入失败不阻塞报告，并标记未送达', async () => {
+    const deps = makeDeps({ inboxPost: () => { throw new Error('INBOX_UNAVAILABLE') } })
+    const outcome = await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(outcome.kind).toBe('ok')
+    if (outcome.kind === 'ok') expect(outcome.inboxDelivered).toBe(false)
+    expect(deps.written.length).toBe(1)
   })
 })

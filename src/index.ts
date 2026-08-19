@@ -73,6 +73,8 @@ import type { UiLang } from './i18n/index.ts'
 import { uploadReport } from './upload.ts'
 import { REPORT_ROUTE, handleReportRequest, reportUrl } from './serve.ts'
 import { injectUserMessage } from './inbox.ts'
+import { renderReport } from './renderer/index.ts'
+import type { NarratedReport } from './report.ts'
 
 // ---- 生产服务的结构契约（避免引入 @deepseek-ai/dsh-* 运行时依赖）----
 
@@ -116,6 +118,11 @@ interface WebServerLike {
     path: string
     handler: (req: unknown, res: unknown) => void | Promise<void>
   }): () => void
+}
+
+/** 无对话 inbox 时，直接返回已脱敏的 Markdown 报告。 */
+export function renderInlineReport(report: NarratedReport, message: string): string {
+  return `${message}\n\n${renderReport(report, 'md')}`
 }
 
 /** 可选服务读取：未注册时返回 undefined（headless/裁剪组合下优雅降级）。 */
@@ -234,18 +241,20 @@ export class TraceNarratorService extends Service {
   }): Promise<{ kind: 'success'; text: string } | { kind: 'error'; text: string }> {
     try {
       const config = this.scope.get()
-      const ui = strings(config.lang === 'en' ? 'en' : 'zh-CN')
+      const defaultUi = strings(config.lang === 'en' ? 'en' : 'zh-CN')
       const parsed = parseArgs(invocation.rawInput)
       if (!parsed.ok) {
-        return { kind: 'error', text: `[exit 2] ${parsed.errors.join('\n')}\n\n${ui.usage}` }
+        return { kind: 'error', text: `[exit 2] ${parsed.errors.join('\n')}\n\n${defaultUi.usage}` }
       }
       if (parsed.help) {
-        return { kind: 'success', text: `${ui.usage}\n${ui.usageBody}` }
+        return { kind: 'success', text: `${defaultUi.usage}\n${defaultUi.usageBody}` }
       }
+      const commandLang = (parsed.overrides.lang ?? config.lang) === 'en' ? 'en' : 'zh-CN'
+      const ui = strings(commandLang)
       const sessionId = parsed.sessionId ?? invocation.agent.session.id
       const outcome = await this.runNarrate(invocation, sessionId, parsed.overrides)
       const buildLink = (): string | undefined => outcome.kind === 'ok' || outcome.kind === 'degraded' || outcome.kind === 'upload-failed'
-        ? outcome.message.match(/\[📄 打开报告\]\(([^)]+)\)/)?.[1]
+        ? outcome.message.match(/\[[^\]]+\]\(([^)]+)\)/)?.[1]
         : undefined
       const buildOutputPath = (): string | undefined => outcome.kind === 'ok' || outcome.kind === 'degraded' || outcome.kind === 'upload-failed'
         ? outcome.outputPath
@@ -255,17 +264,26 @@ export class TraceNarratorService extends Service {
         outputPath: buildOutputPath() ?? '',
         link: buildLink(),
         reportLine: outcome.message.split('\n')[0] ?? '',
-        lang: config.lang === 'en' ? 'en' : 'zh-CN',
+        inboxDelivered: outcome.kind === 'ok' || outcome.kind === 'degraded' || outcome.kind === 'upload-failed'
+          ? outcome.inboxDelivered
+          : false,
+        lang: commandLang,
       })
       switch (outcome.kind) {
         case 'ok':
-          return { kind: 'success', text: buildAck() }
+          return outcome.inboxDelivered
+            ? { kind: 'success', text: buildAck() }
+            : { kind: 'success', text: renderInlineReport(outcome.report, outcome.message) }
         case 'degraded':
-          return { kind: 'success', text: `[exit 5] ${buildAck()}` }
+          return outcome.inboxDelivered
+            ? { kind: 'success', text: `[exit 5] ${buildAck()}` }
+            : { kind: 'success', text: `[exit 5] ${renderInlineReport(outcome.report, outcome.message)}` }
         case 'cancelled': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
         case 'error': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
         case 'upload-failed':
-          return { kind: 'error', text: `[exit 8] ${buildAck()}` }
+          return outcome.inboxDelivered
+            ? { kind: 'error', text: `[exit 8] ${buildAck()}` }
+            : { kind: 'error', text: `[exit 8] ${renderInlineReport(outcome.report, outcome.message)}` }
         /* v8 ignore next -- 封闭联合 */
         default: return { kind: 'error', text: '[exit 2] 未知结果' }
       }

@@ -74,9 +74,9 @@ export interface NarrateRequest {
 }
 
 export type NarrateOutcome =
-  | { kind: 'ok'; message: string; outputPath: string; report: NarratedReport }
-  | { kind: 'degraded'; message: string; outputPath: string; report: NarratedReport }
-  | { kind: 'upload-failed'; exitCode: 8; message: string; outputPath: string; report: NarratedReport }
+  | { kind: 'ok'; message: string; outputPath: string; report: NarratedReport; inboxDelivered: boolean }
+  | { kind: 'degraded'; message: string; outputPath: string; report: NarratedReport; inboxDelivered: boolean }
+  | { kind: 'upload-failed'; exitCode: 8; message: string; outputPath: string; report: NarratedReport; inboxDelivered: boolean }
   | { kind: 'cancelled'; exitCode: 4; message: string }
   | { kind: 'error'; exitCode: 2 | 3 | 6 | 7; message: string }
 
@@ -100,6 +100,27 @@ function formatTimestamp(time: number): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
 }
 
+function redactStructured(value: unknown, redact: (text: string) => string): unknown {
+  if (typeof value === 'string') return redact(value)
+  if (Array.isArray(value)) return value.map(item => redactStructured(item, redact))
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(value)) out[key] = redactStructured(item, redact)
+    return out
+  }
+  return value
+}
+
+function tryInbox(callback: ((text: string) => void) | undefined, text: string): boolean {
+  if (callback === undefined) return false
+  try {
+    callback(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function narrate(deps: NarratorDeps, request: NarrateRequest): Promise<NarrateOutcome> {
   const resolved: TraceNarratorConfig = { ...deps.config, ...definedOverrides(request.overrides) }
   const bypassConfirm = request.overrides.confirm === false || !resolved.confirmBeforeSend
@@ -115,9 +136,6 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
     const detail = error instanceof SessionReadError ? String(error.cause) : String(error)
     return { kind: 'error', exitCode: 3, message: ui.errSessionRead(request.sessionId, detail) }
   }
-
-  // 1b. 预通知：让对话模型知道下一步要整理总结（可空——无 agent 时不注入）
-  deps.inboxPre?.(ui.preInboxNotice(request.sessionId, snapshot.events.length))
 
   // 2. 投影 → 脱敏 → 预算（截断必须在脱敏之后，docs/redaction.md §3）
   const scriptLang: ScriptLang = resolved.lang === 'en' ? 'en' : 'zh-CN'
@@ -223,10 +241,17 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
   }
 
   // 6. 组装报告 → 渲染 → 二次脱敏（LLM 复述的 secret 也要替换）
+  const redactText = (text: string): string => redactor.redactText(text).text
+  const safeSummary = summary === undefined
+    ? undefined
+    : redactStructured(summary, redactText) as Record<string, unknown>
+  const safeRawOutput = rawOutput === undefined ? undefined : redactText(rawOutput)
+  const safeErrors = errors?.map(redactText)
+  const safeTitle = script.meta.title === undefined ? undefined : redactText(script.meta.title)
   const report: NarratedReport = {
     meta: {
       sessionId: request.sessionId,
-      ...(script.meta.title === undefined ? {} : { title: script.meta.title }),
+      ...(safeTitle === undefined ? {} : { title: safeTitle }),
       startedAt: script.meta.startedAt,
       endedAt: script.meta.endedAt,
       eventCount: script.meta.eventCount,
@@ -239,9 +264,9 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
       generatedAt: now(),
     },
     status,
-    ...(summary === undefined ? {} : { summary }),
-    ...(rawOutput === undefined ? {} : { rawOutput }),
-    ...(errors === undefined ? {} : { errors }),
+    ...(safeSummary === undefined ? {} : { summary: safeSummary }),
+    ...(safeRawOutput === undefined ? {} : { rawOutput: safeRawOutput }),
+    ...(safeErrors === undefined ? {} : { errors: safeErrors }),
   }
   const rendered = redactor.redactText(renderReport(report, resolved.format)).text
 
@@ -254,6 +279,38 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
     await deps.writeFile(outputPath, rendered)
   } catch (error) {
     return { kind: 'error', exitCode: 7, message: ui.errWrite(outputPath, String(error)) }
+  }
+
+  const link = deps.serveUrl?.(reportFilename)
+
+  const deliverInbox = (): boolean => {
+    if (summary === undefined) return false
+    tryInbox(
+      deps.inboxPre,
+      ui.preInboxNotice({
+        sessionId: request.sessionId,
+        events: script.meta.eventCount,
+        steps: script.steps.length,
+        redacted: redactor.cumulative().total,
+        schema: loadedSchema.name,
+        redact: resolved.redact,
+        format: resolved.format,
+        lang: langUi,
+      }),
+    )
+    return tryInbox(
+      deps.inboxPost,
+      ui.postInboxPrompt({
+        sessionId: request.sessionId,
+        events: script.meta.eventCount,
+        steps: script.steps.length,
+        redacted: redactor.cumulative().total,
+        outputPath,
+        link,
+        summary: safeSummary ?? {},
+        lang: langUi,
+      }),
+    )
   }
 
   // 8. 审计（confirmed=false 时也记预览统计——用户取消路径在第 3 步已写）
@@ -293,38 +350,24 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
       }
     }
     if (uploadNote !== ui.uploadOk && explicitEndpoint !== undefined) {
-      const link = deps.serveUrl?.(reportFilename)
       const uploadFailedMessage = [
+        uploadNote,
         ui.processSummary(request.sessionId, script.meta.eventCount, script.steps.length, redactor.cumulative().total),
         ui.okMessage(outputPath, redactor.cumulative().total),
         ...(link === undefined ? [] : [ui.openReport(link)]),
-        uploadNote,
       ].join('\n')
-      if (summary !== undefined) {
-        deps.inboxPost?.(
-          ui.postInboxPrompt({
-            sessionId: request.sessionId,
-            events: script.meta.eventCount,
-            steps: script.steps.length,
-            redacted: redactor.cumulative().total,
-            outputPath,
-            link,
-            summary,
-            lang: langUi,
-          }),
-        )
-      }
+      const inboxDelivered = deliverInbox()
       return {
         kind: 'upload-failed',
         exitCode: 8,
         message: uploadFailedMessage,
         outputPath,
         report,
+        inboxDelivered,
       }
     }
   }
 
-  const link = deps.serveUrl?.(reportFilename)
   const messageParts = [
     ui.processSummary(request.sessionId, script.meta.eventCount, script.steps.length, redactor.cumulative().total),
     ui.okMessage(outputPath, redactor.cumulative().total),
@@ -333,27 +376,15 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
   if (loadedSchema.warnings.length > 0) messageParts.push(ui.schemaWarnings(loadedSchema.warnings.length))
   if (uploadNote !== undefined) messageParts.push(uploadNote)
   const message = messageParts.join('\n')
-  if (status === 'ok' && summary !== undefined) {
-    deps.inboxPost?.(
-      ui.postInboxPrompt({
-        sessionId: request.sessionId,
-        events: script.meta.eventCount,
-        steps: script.steps.length,
-        redacted: redactor.cumulative().total,
-        outputPath,
-        link,
-        summary,
-        lang: langUi,
-      }),
-    )
-  }
+  const inboxDelivered = status === 'ok' ? deliverInbox() : false
   if (status === 'ok') {
-    return { kind: 'ok', message, outputPath, report }
+    return { kind: 'ok', message, outputPath, report, inboxDelivered }
   }
   return {
     kind: 'degraded',
     message: `${degradedMessage ?? ''}\n${message}`.trim(),
     outputPath,
     report,
+    inboxDelivered,
   }
 }
