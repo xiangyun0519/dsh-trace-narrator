@@ -2,6 +2,16 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v1.2.0 — 对话式复述
+
+- `src/inbox.ts`：Agent inbox 注入（契约实测 `Agent.inbox: Inbox`，`Inbox.splice(target, start, deleteCount, inserted)` 公开）—— `buildUserMessage` + `injectUserMessage`（next-turn 追加）
+- `src/narrator.ts`：narrate 步骤 1 后注入 `inboxPre`（让对话模型预知整理），成功后注入 `inboxPost`（含 summary JSON + 链接 + 复述指令 + 后续动作建议）；无语境/无 agent 时降级为纯命令输出
+- `src/i18n/index.ts`：`preInboxNotice` / `postInboxPrompt`（zh/en，含完整复述规则：2-3 关键点、链接、对话口吻、5-7 句）+ `commandAck`（短确认文本）
+- `src/index.ts`：handleCommand 把 ok/degraded/upload-failed 的多行长回复替换为短 ack（带链接 + 「详情见对话下一轮」），让对话模型接管叙述
+- 测试：196 用例全绿（新增 inbox 4 项 + narrator 注入 4 项）
+
+验收：typecheck + 196/196 测试 + 构建通过。
+
 ## v1.1.0 — 报告链接（对话内直接点开）
 
 - `src/serve.ts`：`webServer` 前缀路由 `/trace-narrate/<文件名>`（实测契约：`{kind:'prefix', path, handler}`）——同源 HTTP 服务报告；文件名白名单（阻断目录穿越）、仅 .html/.md/.json、no-store

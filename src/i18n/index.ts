@@ -30,6 +30,28 @@ export interface Strings {
   degradedNoLlm: string
   degradedValidation: string
   schemaWarnings: (count: number) => string
+  preInboxNotice: (sessionId: string, events: number) => string
+  postInboxPrompt: (args: PostInboxArgs) => string
+  commandAck: (args: CommandAckArgs) => string
+}
+
+export interface PostInboxArgs {
+  sessionId: string
+  events: number
+  steps: number
+  redacted: number
+  outputPath: string
+  link: string | undefined
+  summary: Record<string, unknown>
+  lang: 'zh-CN' | 'en'
+}
+
+export interface CommandAckArgs {
+  sessionId: string
+  outputPath: string
+  link: string | undefined
+  reportLine: string
+  lang: 'zh-CN' | 'en'
 }
 
 const ZH: Strings = {
@@ -57,6 +79,86 @@ const ZH: Strings = {
   degradedNoLlm: '⚠️ 未生成 AI 总结（LLM 不可用或重试耗尽），已输出纯模板报告。',
   degradedValidation: '⚠️ 总结未通过 schema 校验，原始输出已放入报告附录。',
   schemaWarnings: count => `（schema 有 ${count} 条非致命警告）`,
+  preInboxNotice: (sessionId, events) =>
+    `【插件通知】用户刚调用了 /trace-narrate（会话 ${sessionId}，事件 ${events} 条）。插件已立即按默认配置（summary schema + strict 脱敏）处理完成，并把详细总结通过下一条 inbox 消息发给你。你的任务：\n\n1. 先用一句话向用户打招呼，确认「我刚整理了这次会话的总结，事件 N 条，已脱敏 M 处」\n2. 告诉用户以下哪一项是你即将整理的（让 ta 看到当前默认）：strict 脱敏 + summary schema + HTML 报告\n3. 问 ta 是否要调整——若要，提示 ta 可以重跑 /trace-narrate 加参数（如 /trace-narrate --redact minimal --schema postmortem）\n4. 保持简短（2-4 句），对话口吻\n\n注：完整总结内容在下一条 inbox 消息里，那条消息会要求你把整个总结写在对话中。`,
+  postInboxPrompt: args => args.lang === 'en' ? enPostPrompt(args) : zhPostPrompt(args),
+  commandAck: args => args.lang === 'en' ? enCommandAck(args) : zhCommandAck(args),
+}
+
+function zhPostPrompt(args: PostInboxArgs): string {
+  const linkLine = args.link === undefined
+    ? `报告路径：${args.outputPath}`
+    : `报告路径：${args.outputPath}\n同源链接：[📄 打开报告](${args.link})`
+  const summaryJson = JSON.stringify(args.summary, null, 2)
+  return `【插件 → 对话模型】你刚完成了一次 /trace-narrate 总结。**把下面的完整总结内容直接写在对话里给用户看**（用 Markdown，让 ta 不用打开文件就能读）：
+
+## 会话 ${args.sessionId} 的轨迹总结
+
+- 事件：${args.events} 条 → 剧本：${args.steps} 行 → 已脱敏：${args.redacted} 处
+- ${linkLine}
+
+### 总结内容（已脱敏）
+
+\`\`\`json
+${summaryJson}
+\`\`\`
+
+## 下一步
+
+- 文件已在上面路径生成；同源链接点开即看浏览器版
+- 如需调整（脱敏级别 / schema / 重新生成），告诉用户重跑命令加参数，例如：\`/trace-narrate --redact minimal --schema postmortem\`
+- 也可以问用户要不要：导出 Markdown / 存到项目知识库 / 对比上次会话 / 展开某方面
+
+## 回复要求
+
+1. **必须把「总结内容」JSON 代码块完整复制到你的回复里**（让用户能直接读）
+2. 用 Markdown 把「会话 总结」「数据」「下一步」三段组织好
+3. 报告路径 + 链接放在「下一步」里（可点击）
+4. 对话口吻，不要说"以下是"——直接以"这是这次会话的轨迹总结："开头
+5. 不要压缩、不要缩写 summary 内容——完整性优先`
+}
+
+function enPostPrompt(args: PostInboxArgs): string {
+  const linkLine = args.link === undefined
+    ? `Report: ${args.outputPath}`
+    : `Report: ${args.outputPath}\nLink: [📄 Open report](${args.link})`
+  const summaryJson = JSON.stringify(args.summary, null, 2)
+  return `[Plugin -> conversation model] You just finished a /trace-narrate run. **Write the full summary directly into the conversation for the user to read** (use Markdown; they should not need to open the file):
+
+## Session ${args.sessionId} Trace Summary
+
+- ${args.events} events -> ${args.steps} script lines -> ${args.redacted} redacted
+- ${linkLine}
+
+### Summary (redacted)
+
+\`\`\`json
+${summaryJson}
+\`\`\`
+
+## Next steps
+
+- File written at the path above; click the link for the browser version
+- To adjust (redact / schema / regenerate), tell the user to re-run with flags, e.g. \`/trace-narrate --redact minimal --schema postmortem\`
+- Or ask: export Markdown / save to project knowledge / compare with last session / expand an angle
+
+## Reply requirements
+
+1. **MUST include the full summary JSON code block in your reply** so the user can read it
+2. Organize the three sections above in Markdown
+3. Put the report path + link in "Next steps" (clickable)
+4. Conversational tone; start directly with "Here's the trace summary for this session:"
+5. Do not compress or abbreviate the summary content — completeness over brevity`
+}
+
+function zhCommandAck(args: CommandAckArgs): string {
+  const linkLine = args.link === undefined ? '' : ` · [📄 打开报告](${args.link})`
+  return `${args.reportLine}\n报告已生成：${args.outputPath}${linkLine}\n详情见对话下一轮（对话模型会为你复述）`
+}
+
+function enCommandAck(args: CommandAckArgs): string {
+  const linkLine = args.link === undefined ? '' : ` · [📄 Open report](${args.link})`
+  return `${args.reportLine}\nReport written: ${args.outputPath}${linkLine}\nDetails will be narrated in the next conversation turn`
 }
 
 const EN: Strings = {
@@ -84,6 +186,17 @@ const EN: Strings = {
   degradedNoLlm: '⚠️ No AI summary (LLM unavailable or retries exhausted); template-only report written.',
   degradedValidation: '⚠️ Summary failed schema validation; raw output is in the report appendix.',
   schemaWarnings: count => ` (schema has ${count} non-fatal warnings)`,
+  preInboxNotice: (sessionId, events) =>
+    `[Plugin notice] The user just invoked /trace-narrate (session ${sessionId}, ${events} events). The plugin has already run the pipeline with default config (summary schema + strict redaction) and will hand you the full summary via the next inbox message. Your job now:
+
+1. Greet the user briefly: "I just organized this session's trace summary (N events, M redacted)".
+2. Tell the user which config was used: strict redaction + summary schema + HTML report.
+3. Ask if they want to adjust — point out they can re-run with flags (e.g. /trace-narrate --redact minimal --schema postmortem).
+4. Keep it short (2-4 sentences), conversational tone.
+
+Note: the full summary content arrives in the next inbox message; that message will ask you to output the entire summary in your reply.`,
+  postInboxPrompt: args => args.lang === 'en' ? enPostPrompt(args) : zhPostPrompt(args),
+  commandAck: args => args.lang === 'en' ? enCommandAck(args) : zhCommandAck(args),
 }
 
 export function strings(lang: UiLang): Strings {

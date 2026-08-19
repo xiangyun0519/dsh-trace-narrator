@@ -58,6 +58,9 @@ export interface NarratorDeps {
   ) => Promise<void>
   /** 报告 HTTP 链接（生产 = /trace-narrate/<文件名> 同源路由）；缺省时回复只给本地路径。 */
   serveUrl?: (filename: string) => string | undefined
+  /** 对话式注入：把 user-role 消息塞进当前 agent 收件箱，让对话模型在下一轮自然复述。 */
+  inboxPre?: (text: string) => void
+  inboxPost?: (text: string) => void
   /** $DSH_HOME（schemaDir/audit dir 的兜底根）。 */
   home: string
   workspaceRoot: string
@@ -112,6 +115,9 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
     const detail = error instanceof SessionReadError ? String(error.cause) : String(error)
     return { kind: 'error', exitCode: 3, message: ui.errSessionRead(request.sessionId, detail) }
   }
+
+  // 1b. 预通知：让对话模型知道下一步要整理总结（可空——无 agent 时不注入）
+  deps.inboxPre?.(ui.preInboxNotice(request.sessionId, snapshot.events.length))
 
   // 2. 投影 → 脱敏 → 预算（截断必须在脱敏之后，docs/redaction.md §3）
   const scriptLang: ScriptLang = resolved.lang === 'en' ? 'en' : 'zh-CN'
@@ -288,15 +294,30 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
     }
     if (uploadNote !== ui.uploadOk && explicitEndpoint !== undefined) {
       const link = deps.serveUrl?.(reportFilename)
+      const uploadFailedMessage = [
+        ui.processSummary(request.sessionId, script.meta.eventCount, script.steps.length, redactor.cumulative().total),
+        ui.okMessage(outputPath, redactor.cumulative().total),
+        ...(link === undefined ? [] : [ui.openReport(link)]),
+        uploadNote,
+      ].join('\n')
+      if (summary !== undefined) {
+        deps.inboxPost?.(
+          ui.postInboxPrompt({
+            sessionId: request.sessionId,
+            events: script.meta.eventCount,
+            steps: script.steps.length,
+            redacted: redactor.cumulative().total,
+            outputPath,
+            link,
+            summary,
+            lang: langUi,
+          }),
+        )
+      }
       return {
         kind: 'upload-failed',
         exitCode: 8,
-        message: [
-          ui.processSummary(request.sessionId, script.meta.eventCount, script.steps.length, redactor.cumulative().total),
-          ui.okMessage(outputPath, redactor.cumulative().total),
-          ...(link === undefined ? [] : [ui.openReport(link)]),
-          uploadNote,
-        ].join('\n'),
+        message: uploadFailedMessage,
         outputPath,
         report,
       }
@@ -312,6 +333,20 @@ export async function narrate(deps: NarratorDeps, request: NarrateRequest): Prom
   if (loadedSchema.warnings.length > 0) messageParts.push(ui.schemaWarnings(loadedSchema.warnings.length))
   if (uploadNote !== undefined) messageParts.push(uploadNote)
   const message = messageParts.join('\n')
+  if (status === 'ok' && summary !== undefined) {
+    deps.inboxPost?.(
+      ui.postInboxPrompt({
+        sessionId: request.sessionId,
+        events: script.meta.eventCount,
+        steps: script.steps.length,
+        redacted: redactor.cumulative().total,
+        outputPath,
+        link,
+        summary,
+        lang: langUi,
+      }),
+    )
+  }
   if (status === 'ok') {
     return { kind: 'ok', message, outputPath, report }
   }

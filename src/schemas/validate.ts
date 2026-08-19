@@ -6,7 +6,7 @@
  * @module dsh-trace-narrator/schemas/validate
  */
 
-import Ajv2020 from 'ajv/dist/2020'
+import Ajv2020 from 'ajv/dist/2020.js'
 import type { ErrorObject } from 'ajv'
 import type { JsonSchema } from './builtin.ts'
 

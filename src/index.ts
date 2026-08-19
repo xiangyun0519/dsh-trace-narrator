@@ -50,6 +50,8 @@ export * from './narrator.ts'
 export * from './upload.ts'
 // v1.1.0：报告 HTTP 链接服务（对话内直接点开报告）。
 export * from './serve.ts'
+// v1.2.0：Agent inbox 注入（对话式复述）。
+export * from './inbox.ts'
 
 /** settings 命名空间：trace-narrator（lowercase kebab-case）。 */
 export const TRACE_NARRATOR_NAMESPACE = settingsNamespace('trace-narrator')
@@ -70,6 +72,7 @@ import { strings } from './i18n/index.ts'
 import type { UiLang } from './i18n/index.ts'
 import { uploadReport } from './upload.ts'
 import { REPORT_ROUTE, handleReportRequest, reportUrl } from './serve.ts'
+import { injectUserMessage } from './inbox.ts'
 
 // ---- 生产服务的结构契约（避免引入 @deepseek-ai/dsh-* 运行时依赖）----
 
@@ -152,7 +155,7 @@ function buildConfigSchema() {
     outputDir: z.string().default('trace-narrate'),
     tokenBudget: z.number().step(1).min(3000).max(100000).default(12000),
     maxTokens: z.number().step(1).min(256).max(8192).default(2048),
-    confirmBeforeSend: z.boolean().default(true),
+    confirmBeforeSend: z.boolean().default(false),
     schemaDir: z.string().default(''),
     audit: auditSchema.default({ enabled: true, dir: '', maxBytes: 1048576, keep: 3 }),
     upload: uploadSchema.default(false),
@@ -241,12 +244,28 @@ export class TraceNarratorService extends Service {
       }
       const sessionId = parsed.sessionId ?? invocation.agent.session.id
       const outcome = await this.runNarrate(invocation, sessionId, parsed.overrides)
+      const buildLink = (): string | undefined => outcome.kind === 'ok' || outcome.kind === 'degraded' || outcome.kind === 'upload-failed'
+        ? outcome.message.match(/\[📄 打开报告\]\(([^)]+)\)/)?.[1]
+        : undefined
+      const buildOutputPath = (): string | undefined => outcome.kind === 'ok' || outcome.kind === 'degraded' || outcome.kind === 'upload-failed'
+        ? outcome.outputPath
+        : undefined
+      const buildAck = (): string => ui.commandAck({
+        sessionId,
+        outputPath: buildOutputPath() ?? '',
+        link: buildLink(),
+        reportLine: outcome.message.split('\n')[0] ?? '',
+        lang: config.lang === 'en' ? 'en' : 'zh-CN',
+      })
       switch (outcome.kind) {
-        case 'ok': return { kind: 'success', text: outcome.message }
-        case 'degraded': return { kind: 'success', text: `[exit 5] ${outcome.message}` }
+        case 'ok':
+          return { kind: 'success', text: buildAck() }
+        case 'degraded':
+          return { kind: 'success', text: `[exit 5] ${buildAck()}` }
         case 'cancelled': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
         case 'error': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
-        case 'upload-failed': return { kind: 'error', text: `[exit ${outcome.exitCode}] ${outcome.message}` }
+        case 'upload-failed':
+          return { kind: 'error', text: `[exit 8] ${buildAck()}` }
         /* v8 ignore next -- 封闭联合 */
         default: return { kind: 'error', text: '[exit 2] 未知结果' }
       }
@@ -360,6 +379,16 @@ export class TraceNarratorService extends Service {
         mkdirSync(dirname(absolute), { recursive: true })
         writeFileSync(absolute, content, 'utf8')
       },
+      // 对话式注入：把 user-role 消息塞进当前 agent 收件箱，下一轮对话模型自然复述。
+      ...(() => {
+        const agent = (invocation as unknown as { agent?: { inbox?: { nextTurn: unknown[]; splice: (...args: unknown[]) => unknown } } }).agent
+        if (agent === undefined || agent.inbox === undefined) return {}
+        const a = agent as unknown as Parameters<typeof injectUserMessage>[0]
+        return {
+          inboxPre: (text: string) => { injectUserMessage(a, text) },
+          inboxPost: (text: string) => { injectUserMessage(a, text) },
+        }
+      })(),
       // 宿主全局 fetch POST（HTTPS-only + authEnv 校验在 upload.ts）；
       // ctx.web.fetch 仅支持 GET，故上报不走 web 服务。
       ...(typeof fetch !== 'function' ? {} : {

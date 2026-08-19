@@ -33,12 +33,14 @@ interface TestDeps extends NarratorDeps {
   written: Array<{ path: string; content: string }>
   auditLines: AuditEntry[]
   asked: Array<{ question: string; header: string; options: string[] }>
+  inboxMessages: string[]
 }
 
 function makeDeps(overrides: Partial<NarratorDeps> = {}): TestDeps {
   const written: Array<{ path: string; content: string }> = []
   const auditLines: AuditEntry[] = []
   const asked: Array<{ question: string; header: string; options: string[] }> = []
+  const inboxMessages: string[] = []
   const config: TraceNarratorConfig = {
     lang: 'zh-CN', schema: 'summary', redact: 'strict', format: 'html', outputDir: 'trace-narrate',
     tokenBudget: 12000, maxTokens: 2048, confirmBeforeSend: true, schemaDir: '',
@@ -63,9 +65,11 @@ function makeDeps(overrides: Partial<NarratorDeps> = {}): TestDeps {
     model: { provider: 'p', model: 'm' },
     writeFile: async (path, content) => { written.push({ path, content }) },
     auditWriter: { write(entry) { auditLines.push(entry) } },
+    inboxPre: (text) => { inboxMessages.push(`[pre] ${text}`) },
+    inboxPost: (text) => { inboxMessages.push(`[post] ${text}`) },
     home: '/dsh', workspaceRoot: '/ws',
     now: () => 1710001000000,
-    written, auditLines, asked,
+    written, auditLines, asked, inboxMessages,
     ...overrides,
   }
   return deps
@@ -372,5 +376,45 @@ describe('narrate：报告链接', () => {
       expect(outcome.message).not.toContain('打开报告')
       expect(outcome.message).toContain('📋 会话 sess_1')
     }
+  })
+})
+
+describe('narrate：对话式 inbox 注入', () => {
+  it('成功后注入 post 消息（包含 summary JSON + 链接 + 建议）', async () => {
+    const deps = makeDeps({ serveUrl: f => `/trace-narrate/${f}` })
+    await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    const post = deps.inboxMessages.find(m => m.startsWith('[post]'))
+    expect(post).toBeDefined()
+    expect(post).toContain('sess_1')
+    expect(post).toContain('打开报告](/trace-narrate/')
+    // summary 内容以 JSON 代码块形式附带
+    expect(post).toContain('"title":')
+    expect(post).toContain('"duration":')
+    expect(post).toContain('存到项目知识库')
+  })
+
+  it('读会话后注入 pre 通知', async () => {
+    const deps = makeDeps()
+    await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    const pre = deps.inboxMessages.find(m => m.startsWith('[pre]'))
+    expect(pre).toBeDefined()
+    expect(pre).toContain('sess_1')
+    expect(pre).toContain('插件通知')
+  })
+
+  it('降级（无 llm）不注入 post（无 summary 可复述）', async () => {
+    const deps = makeDeps({ llm: undefined, model: undefined })
+    await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    expect(deps.inboxMessages.filter(m => m.startsWith('[post]')).length).toBe(0)
+  })
+
+  it('英文场景：post 消息含 English chrome', async () => {
+    const deps = makeDeps()
+    deps.config.lang = 'en'
+    deps.config.format = 'html'
+    await narrate(deps, { sessionId: 'sess_1', overrides: { confirm: false } })
+    const post = deps.inboxMessages.find(m => m.startsWith('[post]'))
+    expect(post).toContain('conversation model')
+    expect(post).toContain('Report:')
   })
 })
