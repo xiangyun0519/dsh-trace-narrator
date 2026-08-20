@@ -12,7 +12,23 @@
 
 验收：typecheck + 196/196 测试 + 构建通过。
 
-> v1.2.1 文档补充：在 Mavis / MiniMax Code 里新增了 `dsh-trace-narrator` skill（不修改本插件代码，dsh 端 `/trace-narrate` 保持不变），用户可从 Mavis 对话触发。
+## v1.2.1 — 报告交付硬化
+
+- `src/narrator.ts`：
+  - **inbox 注入时点修正**：原"步骤 1 后立即预通知"改为统一在"渲染/写盘成功后"调用 `deliverInbox()`（失败/取消/降级路径不再有 inbox 幽灵提示）
+  - **结构化二次脱敏**：新增 `redactStructured` 辅助，LLM 回填的 `summary` / `rawOutput` / `errors` / `title` 在组装 `NarratedReport` 前一律过脱敏器（防 LLM 复述时漏脱敏）
+  - **`tryInbox` 容错包装**：注入抛错不再炸管，返回 boolean
+  - **`NarrateOutcome` 三种出口加 `inboxDelivered: boolean`**（`ok` / `degraded` / `upload-failed`）
+- `src/i18n/index.ts`：
+  - `preInboxNotice` 签名升级：`(sessionId, events)` → `PreInboxArgs`（新增 `steps` / `redacted` / `schema` / `redact` / `format`），Mavis 复述指令更精确
+  - `CommandAckArgs` 加 `inboxDelivered` 字段
+  - 新增 `formatName(OutputFormat)` 辅助（zh 显示 HTML / Markdown / JSON）
+- `src/index.ts`：消费新 i18n 接口，commandAck 根据 `inboxDelivered` 决定 ack 文案（"详见对话下一轮" vs 完整内容）
+- `tests/`：i18n 签名矩阵 + inbox 注入容错 + 结构化二次脱敏路径覆盖（4 项新用例）
+- `docs/usage.md`：新增 §1.1 从 Mavis 调用（含冷启动 ≥5 分钟警告，bash timeout 建议 15 分钟）
+- **仓库清理**：删除 `清理本机GitHub-Gitee记录.md`（开发侧笔记，不应进 release）
+
+验收：typecheck + 全部测试 + 构建通过；inbox 注入不再在失败路径幽灵触发；结构化字段二次脱敏。
 
 ## v1.1.0 — 报告链接（对话内直接点开）
 
