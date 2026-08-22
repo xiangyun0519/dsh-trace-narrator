@@ -10,6 +10,7 @@
 - `examples/demo-report.md`：增加完全虚构且已脱敏的可阅读输出样例
 - `docs/release.md`：增加打包、安装、npm 发布、GitHub Release 和发布后检查清单
 - `.github/workflows/ci.yml`：在 push 和 pull request 上验证测试、类型、构建和打包
+- `scripts/check-package.mjs`：断言发布包必需文件存在且不含源码、测试、环境或日志文件
 
 ## v1.2.0 — 对话式复述
 

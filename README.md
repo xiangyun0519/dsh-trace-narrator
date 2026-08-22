@@ -46,7 +46,7 @@ dsh plugin --profile web add dsh-trace-narrator
 /trace-narrate
 ```
 
-默认行为：当前会话 → `summary` schema → strict 脱敏 → 自包含 HTML → 对话内报告链接。
+默认行为：当前会话 → `summary` schema → strict 脱敏 → 自包含 HTML → 对话内报告链接。DSH agent/inbox 能力可用时，还会让对话模型在下一轮复述；headless 或裁剪环境仍返回本地报告。
 
 常用变体：
 
@@ -62,12 +62,13 @@ dsh plugin --profile web add dsh-trace-narrator
 - 生成适合交接或教学的 `summary`、`postmortem`、`tutorial`、`debug`、`executive` 报告
 - 将长 trajectory 压缩后再交给 LLM，总结输出通过 schema 校验
 - 默认 strict 脱敏，支持 HTML、Markdown、JSON 三种输出
-- 让对话模型在下一轮自然复述总结，并给出后续动作建议
-- 可选地把已脱敏报告上报到自托管 viewer；不开启时不联网
+- 在 DSH agent/inbox 能力可用时，让对话模型在下一轮复述总结并给出后续动作建议
+- 可选地把已脱敏报告上报到自托管 viewer；关闭 viewer 上报不会向 viewer 发送报告，但 LLM 总结或 HTTPS schema URL 仍可能联网
 
 ## 安全边界
 
-- trajectory 在发送给 LLM 前先脱敏；LLM 输出在写盘、inbox 和上传前再次脱敏
+- 默认 strict 配置下，trajectory 在发送给 LLM 前先脱敏；使用 `--redact off` 时会关闭这层保证
+- LLM 输出在写盘、inbox 和上传前再次脱敏
 - HTML 动态内容全量转义；报告使用自包含资源，不依赖第三方脚本
 - 上传是 opt-in，且只接受 HTTPS；Bearer token 只从环境变量读取
 - 审计日志只记录检测器、计数和事件序号，不记录原文

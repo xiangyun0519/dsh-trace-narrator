@@ -38,6 +38,6 @@ export interface TraceNarratorConfig {
   /** 空串 = 运行时解析为 $DSH_HOME/schemas */
   schemaDir: string
   audit: AuditConfig
-  /** false = 关闭上传（默认，绝不联网） */
+  /** false = 关闭 viewer 上报（默认；LLM 和 HTTPS schema URL 仍可能联网） */
   upload: false | UploadConfig
 }

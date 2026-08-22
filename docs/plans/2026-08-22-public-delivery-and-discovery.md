@@ -41,12 +41,14 @@
 
 **Files:**
 - Create: `.github/workflows/ci.yml`
+- Create: `scripts/check-package.mjs`
 
 **Steps:**
 
-1. Run install with the lockfile, tests, typecheck, build, and package dry-run on pushes and pull requests.
-2. Use the repository's existing pnpm scripts and Node 20 so CI verifies the actual published package path.
-3. Do not add npm credentials or automatic publishing in this change.
+1. Run install with the lockfile, tests, typecheck, build, and npm package manifest check on pushes and pull requests.
+2. Assert required package files and reject source, test, environment, log, or distribution files before publication.
+3. Use the repository's existing pnpm scripts and Node 20 so CI verifies the actual published package path.
+4. Do not add npm credentials or automatic publishing in this change.
 
 ### Task 4: Verify and record the change
 

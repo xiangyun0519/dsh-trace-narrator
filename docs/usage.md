@@ -30,7 +30,7 @@ dsh plugin --profile <profile> add dsh-trace-narrator
 ```
 
 - 默认：当前会话、`summary` schema、`strict` 脱敏、HTML 输出到 `trace-narrate/`（基于会话工作区）。
-- **对话式复述**：执行完成后命令回复是一个简短确认（路径 + 同源链接），当前对话模型会在下一轮**自然复述**给你——一句话概括 + 2-3 个关键数据点 + 报告链接 + 主动建议 1-2 个后续动作（导出 Markdown、存到知识库、对比上次会话、调整脱敏/schema 重生成）。你看到的不是"按钮+文件"，而是**对话里一段流畅的总结**。
+- **对话式复述**：在 DSH agent/inbox 能力可用时，执行完成后命令回复是一个简短确认（路径 + 同源链接），当前对话模型会在下一轮复述——一句话概括 + 2-3 个关键数据点 + 报告链接 + 主动建议 1-2 个后续动作（导出 Markdown、存到知识库、对比上次会话、调整脱敏/schema 重生成）。headless 或裁剪环境会降级为普通报告输出。
 - **报告链接**：命令回复里直接给出 `[📄 打开报告](/trace-narrate/<文件名>)` 可点击链接（同源，随当前 GUI 端口），点击即在浏览器打开自包含 HTML；无需去文件夹找文件。
 - `--schema` 解析顺序：内置名（summary/postmortem/tutorial/debug/executive）→ URL（仅 HTTPS，10s/64KB 限制）→ 文件路径 → 已保存名（`$DSH_HOME/schemas/<name>.json`）。
 - 发送前确认：默认弹出「N 事件、已脱敏 M 处，发送？」；`--yes` 跳过；无交互能力的环境必须显式 `--yes`，否则不发送（exit 4）。
@@ -83,11 +83,11 @@ dsh plugin --profile <profile> add dsh-trace-narrator
 
 ## 7. 安全模型摘要
 
-1. **脱敏先于 LLM**：剧本在离开本地前已完成脱敏（默认 strict）。
+1. **默认脱敏先于 LLM**：默认 strict 时，剧本在发送给 LLM 前已完成脱敏；显式使用 `--redact off` 会关闭这层保护。
 2. **确定性占位符**：同一 secret 同一 `[REDACTED:TYPE:hash8]`，映射只存内存。
 3. **输出物二次脱敏**：LLM 复述的 secret 也会在渲染后被替换。
 4. **注入防护分层**：trace→LLM 的 prompt injection（DATA 包裹 + 显式指令）与 LLM→HTML 的注入（渲染器全量转义）是两层独立防线。
-5. **本地为默认**：不开 `--upload` / 不配置 upload 端点绝不联网。
+5. **本地报告为默认**：不开 `--upload` / 不配置 upload 端点时，不会向 viewer 上报报告；LLM 总结和 HTTPS schema URL 仍可能联网。
 
 ## 8. 已知限制
 
