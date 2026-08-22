@@ -2,6 +2,15 @@
 
 每个版本对应 main 上一个 commit + 一个 tag（`vX.Y.Z`），任意 tag 均可安装可回滚。
 
+## v1.2.2 — 公开交付准备
+
+- `package.json`：补充 npm 搜索、仓库、Issues、主页和公开发布元数据，明确打包白名单
+- `LICENSE`：补齐 README 和 npm 元数据引用的 MIT 许可证
+- `README.md`：将目标用户、源码/npm 安装、示例报告和产品边界前置
+- `examples/demo-report.md`：增加完全虚构且已脱敏的可阅读输出样例
+- `docs/release.md`：增加打包、安装、npm 发布、GitHub Release 和发布后检查清单
+- `.github/workflows/ci.yml`：在 push 和 pull request 上验证测试、类型、构建和打包
+
 ## v1.2.0 — 对话式复述
 
 - `src/inbox.ts`：Agent inbox 注入（契约实测 `Agent.inbox: Inbox`，`Inbox.splice(target, start, deleteCount, inserted)` 公开）—— `buildUserMessage` + `injectUserMessage`（next-turn 追加）

@@ -1,7 +1,26 @@
 {
   "name": "dsh-trace-narrator",
   "description": "DSH 插件：把会话轨迹变成可分享、可复盘、可教学的结构化报告（脱敏 + LLM 总结，HTML/MD/JSON 输出）",
-  "version": "1.2.1",
+  "version": "1.2.2",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "trajectory",
+    "llm",
+    "conversation",
+    "postmortem",
+    "redaction"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiangyun0519/dsh-trace-narrator.git"
+  },
+  "homepage": "https://github.com/xiangyun0519/dsh-trace-narrator#readme",
+  "bugs": {
+    "url": "https://github.com/xiangyun0519/dsh-trace-narrator/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -12,9 +31,10 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["lib", "cordis.patch.yml"],
+  "files": ["lib", "cordis.patch.yml", "README.md", "LICENSE"],
   "engines": { "node": ">=20" },
   "license": "MIT",
+  "publishConfig": { "access": "public" },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
